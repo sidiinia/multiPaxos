@@ -2,31 +2,59 @@ import java.io.Serializable;
 
 public class Packet implements Serializable {
 
-    private final String message;
 
-    private final int port;
+    private int ballotNum;
 
-    private int money;
+    private int acceptNum;
 
-    private int type;
+    private int acceptVal;
+
+    private int numTicket;
+
+    private String type;
 
     private int sender;
 
-    private int markerCounter;
 
-    public Packet(int type, String message, int port, int money, int sender, int markerCounter) {
+
+    public Packet(String type,int ballotNum, int acceptNum, int acceptVal, int sender) {
         this.type = type;
-        this.message = message;
-        this.port = port;
-        this.money = money;
+        this.ballotNum = ballotNum;
+        this.acceptNum = acceptNum;
+        this.acceptVal = acceptVal;
         this.sender = sender;
-        this.markerCounter = markerCounter;
+
     }
 
 
-
-    @Override
-    public String toString() {
-        return String.format("Packet [message=%s", message);
+    public String getType() {
+        return type;
     }
+
+
+    public int getSender() {
+        return sender;
+    }
+
+    public int getBallotNum() {
+        return ballotNum;
+    }
+
+    public int getAcceptNum() {
+        return acceptNum;
+    }
+
+    public int getAcceptVal() {
+        return acceptVal;
+    }
+
+
+    public void printPacket() {
+        System.out.println("THE PACKET: ");
+        System.out.println("The type is " + getType());
+        System.out.println("The ballot number is " + getBallotNum());
+        System.out.println("The acceptNum is " + getAcceptNum());
+        System.out.println("The acceptVal is " + getAcceptVal());
+    }
+
 }

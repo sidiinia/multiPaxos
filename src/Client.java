@@ -1,13 +1,29 @@
+
 import java.io.*;
 import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
+import static java.lang.Thread.activeCount;
 import static java.lang.Thread.sleep;
 
 public class Client {
     static int port;
     static int[] portNums;
+
+    static int leaderPid = 3000; // leader election
+    static int counter = 0; // count ack back, to compare with majority
+    static int counterAccept = 0; //leader counts how many accept received
+    static boolean incrementCounterAccept = false; //flag to see if needs to increment counterAccept or not
+    static int resTicket = 100;
+    static List<Integer> log = new ArrayList<>();
+
+
+
+    static volatile int ballotNum;
+    static volatile int acceptNum;
+    static volatile int acceptVal;
+
 
     static volatile List<Socket> incomingSockets = new ArrayList<>();
     static volatile List<Socket> outgoingSockets = new ArrayList<>();
@@ -61,6 +77,50 @@ public class Client {
             t.start();
         }
 
+
+        String clientCommand = "";
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+
+        try {
+            while (!clientCommand.equals("quit")) {
+                clientCommand = br.readLine();
+                String[] splited = clientCommand.split("\\s+");
+                if (splited[0].equals("buy")) {
+                    int numOftickets = Integer.parseInt(splited[1]);
+                    // if i am the leader, send accept msg
+                    if(Client.port == leaderPid) {
+
+                    }
+
+
+
+                    //if i am not the leader, send msg to the leader
+                    else {
+                        Packet packet = new Packet("Request", Client.ballotNum, Client.acceptNum, numOftickets, Client.port);
+                        sendPacketToLeader(packet);
+                    }
+
+                }
+                else if (splited[0].equals("show")) {
+                    //show the state of the state machine
+                    //show the committed logs
+                    System.out.println("Remaining tickets " + Client.resTicket);
+                    System.out.println("The log: ");
+                    for(int i=0; i<log.size(); i++) {
+                        System.out.print(log.get(i) + " ");
+                    }
+
+
+                }
+                else {
+
+                }
+            }
+        } catch (IOException e) {
+
+        }
+
+
     }
 
 
@@ -79,6 +139,69 @@ public class Client {
                 }
         }
     }
+
+
+
+    public static void sendPrepare() {
+        for (int i = 0; i < outgoingSockets.size(); i++) {
+            Socket clientSocket = outgoingSockets.get(i);
+            Packet packet = new Packet("Prepare", 0, 0, 0, port);
+
+            try {
+                ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
+                outStream.writeObject(packet);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+
+    public static void sendPacket(Socket socket , Packet packet) {
+
+        try {
+            ObjectOutputStream outStream = new ObjectOutputStream(socket.getOutputStream());
+            outStream.writeObject(packet);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    public static void sendPacketToAll(Packet packet) {
+        for(int i = 0; i<outgoingSockets.size(); i++) {
+            Socket clientSocket = outgoingSockets.get(i);
+
+            try {
+                ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
+                outStream.writeObject(packet);
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+    public static void sendPacketToLeader(Packet packet) {
+        for(int i=0; i<outgoingSockets.size(); i++) {
+            Socket leaderSocket = outgoingSockets.get(i);
+            if(leaderSocket.getPort() == leaderPid) {
+                sendPacket(leaderSocket, packet);
+            }
+        }
+
+    }
+
+
+
+    public static void sendHeartBeat() {
+
+    }
+
+
 }
 
 
@@ -99,6 +222,73 @@ class ReadThread implements Runnable {
                 //System.out.println("reading from " + clientSocket);
                 inStream = new ObjectInputStream(clientSocket.getInputStream());
                 packet = (Packet) inStream.readObject();
+
+
+                //if receiving "Prepare", then leader election
+                if(packet.getType().equals("Prepare")) {
+                    if(packet.getBallotNum() >= Client.ballotNum) {
+                        Client.ballotNum = packet.getBallotNum();
+                        Packet ackPacket = new Packet("Ack", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
+                        ackPacket.printPacket();
+                        Client.sendPacketToAll(ackPacket);
+                    }
+                }
+                //if receiving "Ack", the client agrees that I could be the leader
+                else if(packet.getType().equals("Ack")) {
+                    Client.counter++;
+                    if(Client.counter >= (int)Math.ceil((double)Client.portNums.length+1)/2 -1) {
+
+                    }
+                }
+
+                //if receiving "AcceptFromLeader", decide if I will accept this value or not
+                else if(packet.getType().equals("AcceptFromLeader")) {
+                    System.out.println("receive AcceptFromLeader");
+                    if(packet.getBallotNum() >= Client.ballotNum) {
+                        Client.acceptNum = packet.getBallotNum();
+                        Client.acceptVal = packet.getAcceptVal();
+                        Packet ackAcceptPacket = new Packet("AcceptFromClient", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
+                        ackAcceptPacket.printPacket();
+                        Client.sendPacketToLeader(ackAcceptPacket);
+                    }
+                }
+
+                //if receiving "AcceptFromClient" from the majority, leader will make a decision
+                else if(packet.getType().equals("AcceptFromClient")) {
+                    if(Client.incrementCounterAccept) {
+                        Client.counterAccept++;
+                        if(Client.counterAccept >= (int)Math.ceil((double)Client.portNums.length+1)/2 -1) {
+                            Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
+                            decisionPacket.printPacket();
+                            Client.sendPacketToAll(decisionPacket);
+                            Client.log.add(packet.getAcceptVal()); // update leader's log
+                            Client.resTicket -= packet.getAcceptVal();
+                            Client.incrementCounterAccept = false;
+                            Client.counterAccept = 0;
+                        }
+
+                    }
+
+                }
+
+                //if I am the leader, send "AcceptFromLeader" to others
+                else if(packet.getType().equals("Request")) {
+                    System.out.println("want to buy " + packet.getAcceptVal());
+                    Client.ballotNum++; //increment leader's ballotnum
+                    Client.acceptNum = Client.ballotNum;
+                    Client.acceptVal = packet.getAcceptVal();
+                    Packet acceptPacket = new Packet("AcceptFromLeader", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
+                    acceptPacket.printPacket();
+                    Client.incrementCounterAccept = true;
+                    Client.sendPacketToAll(acceptPacket);
+                }
+
+                else if(packet.getType().equals("Decision")) {
+                    System.out.println("receiving decision");
+                    Client.log.add(packet.getAcceptVal());
+                    Client.resTicket -= packet.getAcceptVal();
+                }
+
                 try {
                     sleep(5000);
                 } catch (InterruptedException e) {
