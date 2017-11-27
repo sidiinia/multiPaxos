@@ -1,10 +1,8 @@
-
 import java.io.*;
 import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
-import static java.lang.Thread.activeCount;
 import static java.lang.Thread.sleep;
 
 public class Client {
@@ -89,17 +87,29 @@ public class Client {
                     int numOftickets = Integer.parseInt(splited[1]);
                     // if i am the leader, send accept msg
                     if(Client.port == leaderPid) {
-
+                        if(Client.resTicket < numOftickets) {
+                            System.out.println("The remaining tickets are not enough!");
+                        }
+                        else {
+                            Client.ballotNum++;
+                            Client.acceptNum = Client.ballotNum;
+                            Client.acceptVal = numOftickets;
+                            Packet acceptPacket = new Packet("AcceptFromLeader", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
+                            Client.incrementCounterAccept = true;
+                            sendPacketToAll(acceptPacket);
+                        }
                     }
-
-
 
                     //if i am not the leader, send msg to the leader
                     else {
-                        Packet packet = new Packet("Request", Client.ballotNum, Client.acceptNum, numOftickets, Client.port);
-                        sendPacketToLeader(packet);
+                        if(Client.resTicket < numOftickets) {
+                            System.out.println("The remaining tickets are not enough!");
+                        }
+                        else {
+                            Packet packet = new Packet("Request", Client.ballotNum, Client.acceptNum, numOftickets, Client.port);
+                            sendPacketToLeader(packet);
+                        }
                     }
-
                 }
                 else if (splited[0].equals("show")) {
                     //show the state of the state machine
@@ -109,7 +119,7 @@ public class Client {
                     for(int i=0; i<log.size(); i++) {
                         System.out.print(log.get(i) + " ");
                     }
-
+                    System.out.println();
 
                 }
                 else {
@@ -245,6 +255,7 @@ class ReadThread implements Runnable {
                 else if(packet.getType().equals("AcceptFromLeader")) {
                     System.out.println("receive AcceptFromLeader");
                     if(packet.getBallotNum() >= Client.ballotNum) {
+                        Client.ballotNum = packet.getBallotNum();
                         Client.acceptNum = packet.getBallotNum();
                         Client.acceptVal = packet.getAcceptVal();
                         Packet ackAcceptPacket = new Packet("AcceptFromClient", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);

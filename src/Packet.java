@@ -9,8 +9,6 @@ public class Packet implements Serializable {
 
     private int acceptVal;
 
-    private int numTicket;
-
     private String type;
 
     private int sender;
