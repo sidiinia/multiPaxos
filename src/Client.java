@@ -7,7 +7,8 @@ import static java.lang.Thread.sleep;
 
 public class Client {
     static int port;
-    static int[] portNums;
+   // static int[] portNums;
+    static ArrayList<Integer> portNums;
 
     static int leaderPid = 3000; // leader election
     static int counter = 0; // count ack back, to compare with majority
@@ -40,27 +41,29 @@ public class Client {
         String line = sc.nextLine();
         sc.close();
         String[] ports = line.split(" ");
-        portNums = new int[ports.length];
+        //portNums = new int[ports.length];
+        portNums = new ArrayList<>();
         for (int i = 0; i < ports.length; i++) {
-            portNums[i] = Integer.parseInt(ports[i]);
+            //portNums[i] = Integer.parseInt(ports[i]);
+            portNums.add(Integer.parseInt(ports[i]));
         }
 
         CreateServerSocket ss = new CreateServerSocket(port);
         ss.start();
 
         // check if server exists, if exists, connect clients, else wait
-        for (int i = 0; i < portNums.length; i++) {
-            if (portNums[i] != port) {
-                while (!serverListening("127.0.0.1", portNums[i])) {
+        for (int i = 0; i < portNums.size(); i++) {
+            if (portNums.get(i) != port) {
+                while (!serverListening("127.0.0.1", portNums.get(i))) {
                 }
-                Socket s = new Socket("127.0.0.1", portNums[i]);
+                Socket s = new Socket("127.0.0.1", portNums.get(i));
                 outgoingSockets.add(s);
             }
         }
 
 
         // wait for all the clients to come in
-        while (incomingSockets.size() != 2 * (portNums.length - 1)) {
+        while (incomingSockets.size() != 2 * (portNums.size() - 1)) {
         }
         for (int i = 0; i < incomingSockets.size(); i++) {
             if (incomingSockets.get(i).isClosed()) {
@@ -68,11 +71,34 @@ public class Client {
             }
         }
 
+
         //read
         for (int i = 0; i < incomingSockets.size(); i++) {
             ReadThread r1 = new ReadThread(incomingSockets.get(i));
             Thread t = new Thread(r1);
             t.start();
+        }
+
+/*
+        //send heartbeat thread
+        for(int i=0; i<outgoingSockets.size(); i++) {
+            sendHeartbeatThread h1 = new sendHeartbeatThread(outgoingSockets.get(i));
+            Thread t = new Thread(h1);
+            t.start();
+        }
+*/
+
+        for(int i=0; i<outgoingSockets.size(); i++) {
+            try {
+                sendHeartbeatThread h1 = new sendHeartbeatThread(outgoingSockets.get(i));
+                Thread t = new Thread(h1);
+                t.start();
+            } catch (Exception e) {
+                if(outgoingSockets.get(i).isClosed()) {
+                    outgoingSockets.remove(outgoingSockets.get(i));
+                    System.out.println("Lost the connection");
+                }
+            }
         }
 
 
@@ -82,18 +108,18 @@ public class Client {
         try {
             while (!clientCommand.equals("quit")) {
                 clientCommand = br.readLine();
-                String[] splited = clientCommand.split("\\s+");
-                if (splited[0].equals("buy")) {
-                    int numOftickets = Integer.parseInt(splited[1]);
+                String[] splitted = clientCommand.split("\\s+");
+                if (splitted[0].equals("buy")) {
+                    int numOfTickets = Integer.parseInt(splitted[1]);
                     // if i am the leader, send accept msg
                     if(Client.port == leaderPid) {
-                        if(Client.resTicket < numOftickets) {
+                        if(Client.resTicket < numOfTickets) {
                             System.out.println("The remaining tickets are not enough!");
                         }
                         else {
                             Client.ballotNum++;
                             Client.acceptNum = Client.ballotNum;
-                            Client.acceptVal = numOftickets;
+                            Client.acceptVal = numOfTickets;
                             Packet acceptPacket = new Packet("AcceptFromLeader", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
                             Client.incrementCounterAccept = true;
                             sendPacketToAll(acceptPacket);
@@ -102,16 +128,16 @@ public class Client {
 
                     //if i am not the leader, send msg to the leader
                     else {
-                        if(Client.resTicket < numOftickets) {
+                        if(Client.resTicket < numOfTickets) {
                             System.out.println("The remaining tickets are not enough!");
                         }
                         else {
-                            Packet packet = new Packet("Request", Client.ballotNum, Client.acceptNum, numOftickets, Client.port);
+                            Packet packet = new Packet("Request", Client.ballotNum, Client.acceptNum, numOfTickets, Client.port);
                             sendPacketToLeader(packet);
                         }
                     }
                 }
-                else if (splited[0].equals("show")) {
+                else if (splitted[0].equals("show")) {
                     //show the state of the state machine
                     //show the committed logs
                     System.out.println("Remaining tickets " + Client.resTicket);
@@ -207,11 +233,6 @@ public class Client {
 
 
 
-    public static void sendHeartBeat() {
-
-    }
-
-
 }
 
 
@@ -246,7 +267,7 @@ class ReadThread implements Runnable {
                 //if receiving "Ack", the client agrees that I could be the leader
                 else if(packet.getType().equals("Ack")) {
                     Client.counter++;
-                    if(Client.counter >= (int)Math.ceil((double)Client.portNums.length+1)/2 -1) {
+                    if(Client.counter >= (int)Math.ceil((double)Client.portNums.size()+1)/2 -1) {
 
                     }
                 }
@@ -268,7 +289,7 @@ class ReadThread implements Runnable {
                 else if(packet.getType().equals("AcceptFromClient")) {
                     if(Client.incrementCounterAccept) {
                         Client.counterAccept++;
-                        if(Client.counterAccept >= (int)Math.ceil((double)Client.portNums.length+1)/2 -1) {
+                        if(Client.counterAccept >= (int)Math.ceil((double)Client.portNums.size()+1)/2 -1) {
                             Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
                             decisionPacket.printPacket();
                             Client.sendPacketToAll(decisionPacket);
@@ -281,6 +302,7 @@ class ReadThread implements Runnable {
                     }
 
                 }
+
 
                 //if I am the leader, send "AcceptFromLeader" to others
                 else if(packet.getType().equals("Request")) {
@@ -300,8 +322,14 @@ class ReadThread implements Runnable {
                     Client.resTicket -= packet.getAcceptVal();
                 }
 
+
+                else if(packet.getType().equals("HeartBeat")) {
+                    //System.out.println("RECEIVED A HEARTBEAT");
+
+                }
+
                 try {
-                    sleep(5000);
+                    sleep(1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -316,3 +344,27 @@ class ReadThread implements Runnable {
         }
     }
 }
+
+
+class sendHeartbeatThread implements Runnable {
+    Socket clientSocket;
+    static Semaphore semaphore = new Semaphore(1);
+
+    public sendHeartbeatThread(Socket clientSocket) {
+        this.clientSocket = clientSocket;
+    }
+
+    public void run() {
+        Packet packet = new Packet("HeartBeat", -1, -1, -1, Client.port);
+        while (true) {
+            try {
+                sleep(3000);
+                Client.sendPacket(clientSocket, packet);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+
