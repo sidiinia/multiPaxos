@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
@@ -7,7 +8,7 @@ import static java.lang.Thread.sleep;
 
 public class Client {
     static int port;
-   // static int[] portNums;
+    //static int[] portNums;
     static ArrayList<Integer> portNums;
 
     static int leaderPid = 3000; // leader election
@@ -16,7 +17,7 @@ public class Client {
     static boolean incrementCounterAccept = false; //flag to see if needs to increment counterAccept or not
     static int resTicket = 100;
     static List<Integer> log = new ArrayList<>();
-
+    //static List<Socket> liveCenter = new ArrayList<>(); // live center to check which servers are alive
 
 
     static volatile int ballotNum;
@@ -94,10 +95,7 @@ public class Client {
                 Thread t = new Thread(h1);
                 t.start();
             } catch (Exception e) {
-                if(outgoingSockets.get(i).isClosed()) {
-                    outgoingSockets.remove(outgoingSockets.get(i));
-                    System.out.println("Lost the connection");
-                }
+
             }
         }
 
@@ -201,7 +199,17 @@ public class Client {
             outStream.writeObject(packet);
 
         } catch (IOException e) {
-            e.printStackTrace();
+            if(Client.portNums.contains(socket.getPort())) {
+                for(int i=0; i<portNums.size(); i++) {
+                    if(portNums.get(i) == socket.getPort()) {
+                        Client.portNums.remove(i);
+                    }
+                }
+                System.out.println("Removing " + socket.getPort());
+                System.out.println("The size of portNum is " + Client.portNums.size());
+            }
+
+            //e.printStackTrace();
         }
     }
 
@@ -210,13 +218,17 @@ public class Client {
         for(int i = 0; i<outgoingSockets.size(); i++) {
             Socket clientSocket = outgoingSockets.get(i);
 
+            sendPacket(clientSocket, packet);
+
+            /*
             try {
                 ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
                 outStream.writeObject(packet);
 
             } catch (IOException e) {
-                e.printStackTrace();
+                //e.printStackTrace();
             }
+            */
         }
     }
 
@@ -348,6 +360,8 @@ class ReadThread implements Runnable {
 
 class sendHeartbeatThread implements Runnable {
     Socket clientSocket;
+    public static volatile boolean flag = true;
+
     static Semaphore semaphore = new Semaphore(1);
 
     public sendHeartbeatThread(Socket clientSocket) {
@@ -356,11 +370,13 @@ class sendHeartbeatThread implements Runnable {
 
     public void run() {
         Packet packet = new Packet("HeartBeat", -1, -1, -1, Client.port);
-        while (true) {
+        while (flag) {
             try {
                 sleep(3000);
                 Client.sendPacket(clientSocket, packet);
+
             } catch (InterruptedException e) {
+                flag = false;
                 e.printStackTrace();
             }
         }
