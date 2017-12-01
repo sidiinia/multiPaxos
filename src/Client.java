@@ -214,7 +214,9 @@ public class Client {
 
                 if (socket.getPort() == Client.leaderPid) {
                     System.out.println("detected leader failure, restart phase 1");
-                    // todo
+                    ballotNum++;
+                    Packet p = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port);
+                    sendPacketToAll(p);
                 } else {
                     System.out.println("detected non-leader failure");
                 }

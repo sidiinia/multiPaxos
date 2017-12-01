@@ -27,7 +27,8 @@ class ReadThread implements Runnable {
                 //if receiving "Prepare", then leader election
                 if(packet.getType().equals("Prepare")) {
                     System.out.println("received Prepare!");
-                    if(packet.getBallotNum() >= Client.ballotNum) {
+                    if(packet.getBallotNum() > Client.ballotNum ||
+                            (packet.getBallotNum() == Client.ballotNum && packet.getSender() < Client.port)) {
                         Client.ballotNum = packet.getBallotNum();
                         Packet ackPacket = new Packet("Ack", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
                         //ackPacket.printPacket();
