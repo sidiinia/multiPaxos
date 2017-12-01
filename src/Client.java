@@ -11,8 +11,9 @@ public class Client {
     //static int[] portNums;
     static ArrayList<Integer> portNums;
 
-    static int leaderPid = 3000; // leader election
+    static int leaderPid; // leader election
     static int counter = 0; // count ack back, to compare with majority
+    static boolean incrementCounter = true;
     static int counterAccept = 0; //leader counts how many accept received
     static boolean incrementCounterAccept = false; //flag to see if needs to increment counterAccept or not
     static int resTicket = 100;
@@ -72,7 +73,6 @@ public class Client {
             }
         }
 
-
         //read
         for (int i = 0; i < incomingSockets.size(); i++) {
             ReadThread r1 = new ReadThread(incomingSockets.get(i));
@@ -80,6 +80,12 @@ public class Client {
             t.start();
         }
 
+        // 3000 start leader election
+        if (port == portNums.get(0)) {
+            ballotNum++;
+            Packet packet = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port);
+            sendPacketToAll(packet);
+        }
 /*
         //send heartbeat thread
         for(int i=0; i<outgoingSockets.size(); i++) {
@@ -89,6 +95,7 @@ public class Client {
         }
 */
 
+        // send heartbeat
         for(int i=0; i<outgoingSockets.size(); i++) {
             try {
                 sendHeartbeatThread h1 = new sendHeartbeatThread(outgoingSockets.get(i));
@@ -99,7 +106,7 @@ public class Client {
             }
         }
 
-
+        // take user command line input
         String clientCommand = "";
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 
@@ -200,16 +207,18 @@ public class Client {
 
         } catch (IOException e) {
             if(Client.portNums.contains(socket.getPort())) {
-                for(int i=0; i<portNums.size(); i++) {
-                    if(portNums.get(i) == socket.getPort()) {
-                        Client.portNums.remove(i);
-                    }
-                }
+                portNums.remove(new Integer(socket.getPort()));
+                outgoingSockets.remove(socket);
                 System.out.println("Removing " + socket.getPort());
-                System.out.println("The size of portNum is " + Client.portNums.size());
-            }
+                //System.out.println("The size of portNum is " + Client.portNums.size());
 
-            //e.printStackTrace();
+                if (socket.getPort() == Client.leaderPid) {
+                    System.out.println("detected leader failure, restart phase 1");
+                    // todo
+                } else {
+                    System.out.println("detected non-leader failure");
+                }
+            }
         }
     }
 
@@ -219,19 +228,17 @@ public class Client {
             Socket clientSocket = outgoingSockets.get(i);
 
             sendPacket(clientSocket, packet);
-
-            /*
-            try {
-                ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
-                outStream.writeObject(packet);
-
-            } catch (IOException e) {
-                //e.printStackTrace();
-            }
-            */
         }
     }
 
+    public static void sendPacketToPort(Packet packet, int port) {
+        for (int i = 0; i < outgoingSockets.size(); i++) {
+            Socket socket = outgoingSockets.get(i);
+            if (socket.getPort() == port) {
+                sendPacket(socket, packet);
+            }
+        }
+    }
 
     public static void sendPacketToLeader(Packet packet) {
         for(int i=0; i<outgoingSockets.size(); i++) {
@@ -246,117 +253,6 @@ public class Client {
 
 
 }
-
-
-class ReadThread implements Runnable {
-    Socket clientSocket;
-    static Semaphore semaphore = new Semaphore(1);
-
-    public ReadThread(Socket clientSocket) {
-        this.clientSocket = clientSocket;
-    }
-
-
-    public void run() {
-        while (true) {
-            Packet packet;
-            ObjectInputStream inStream;
-            try {
-                //System.out.println("reading from " + clientSocket);
-                inStream = new ObjectInputStream(clientSocket.getInputStream());
-                packet = (Packet) inStream.readObject();
-
-
-                //if receiving "Prepare", then leader election
-                if(packet.getType().equals("Prepare")) {
-                    if(packet.getBallotNum() >= Client.ballotNum) {
-                        Client.ballotNum = packet.getBallotNum();
-                        Packet ackPacket = new Packet("Ack", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
-                        ackPacket.printPacket();
-                        Client.sendPacketToAll(ackPacket);
-                    }
-                }
-                //if receiving "Ack", the client agrees that I could be the leader
-                else if(packet.getType().equals("Ack")) {
-                    Client.counter++;
-                    if(Client.counter >= (int)Math.ceil((double)Client.portNums.size()+1)/2 -1) {
-
-                    }
-                }
-
-                //if receiving "AcceptFromLeader", decide if I will accept this value or not
-                else if(packet.getType().equals("AcceptFromLeader")) {
-                    System.out.println("receive AcceptFromLeader");
-                    if(packet.getBallotNum() >= Client.ballotNum) {
-                        Client.ballotNum = packet.getBallotNum();
-                        Client.acceptNum = packet.getBallotNum();
-                        Client.acceptVal = packet.getAcceptVal();
-                        Packet ackAcceptPacket = new Packet("AcceptFromClient", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
-                        ackAcceptPacket.printPacket();
-                        Client.sendPacketToLeader(ackAcceptPacket);
-                    }
-                }
-
-                //if receiving "AcceptFromClient" from the majority, leader will make a decision
-                else if(packet.getType().equals("AcceptFromClient")) {
-                    if(Client.incrementCounterAccept) {
-                        Client.counterAccept++;
-                        if(Client.counterAccept >= (int)Math.ceil((double)Client.portNums.size()+1)/2 -1) {
-                            Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
-                            decisionPacket.printPacket();
-                            Client.sendPacketToAll(decisionPacket);
-                            Client.log.add(packet.getAcceptVal()); // update leader's log
-                            Client.resTicket -= packet.getAcceptVal();
-                            Client.incrementCounterAccept = false;
-                            Client.counterAccept = 0;
-                        }
-
-                    }
-
-                }
-
-
-                //if I am the leader, send "AcceptFromLeader" to others
-                else if(packet.getType().equals("Request")) {
-                    System.out.println("want to buy " + packet.getAcceptVal());
-                    Client.ballotNum++; //increment leader's ballotnum
-                    Client.acceptNum = Client.ballotNum;
-                    Client.acceptVal = packet.getAcceptVal();
-                    Packet acceptPacket = new Packet("AcceptFromLeader", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
-                    acceptPacket.printPacket();
-                    Client.incrementCounterAccept = true;
-                    Client.sendPacketToAll(acceptPacket);
-                }
-
-                else if(packet.getType().equals("Decision")) {
-                    System.out.println("receiving decision");
-                    Client.log.add(packet.getAcceptVal());
-                    Client.resTicket -= packet.getAcceptVal();
-                }
-
-
-                else if(packet.getType().equals("HeartBeat")) {
-                    //System.out.println("RECEIVED A HEARTBEAT");
-
-                }
-
-                try {
-                    sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-            } catch (EOFException e) {
-                //System.out.println("here");
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (ClassNotFoundException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-}
-
 
 class sendHeartbeatThread implements Runnable {
     Socket clientSocket;
@@ -374,7 +270,6 @@ class sendHeartbeatThread implements Runnable {
             try {
                 sleep(3000);
                 Client.sendPacket(clientSocket, packet);
-
             } catch (InterruptedException e) {
                 flag = false;
                 e.printStackTrace();
