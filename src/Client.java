@@ -18,7 +18,7 @@ public class Client {
     static boolean incrementCounterAccept = false; //flag to see if needs to increment counterAccept or not
     static int resTicket = 100;
     static List<Integer> log = new ArrayList<>();
-    //static List<Socket> liveCenter = new ArrayList<>(); // live center to check which servers are alive
+    //static List<Integer> liveCenter = new ArrayList<>(); // live center to check which servers are alive
 
 
     static volatile int ballotNum;
@@ -48,6 +48,7 @@ public class Client {
         for (int i = 0; i < ports.length; i++) {
             //portNums[i] = Integer.parseInt(ports[i]);
             portNums.add(Integer.parseInt(ports[i]));
+            liveCenter.add(Integer.parseInt(ports[i])); // stores all the live machines port number into liveCenter
         }
 
         CreateServerSocket ss = new CreateServerSocket(port);
@@ -80,12 +81,15 @@ public class Client {
             t.start();
         }
 
+        /*
         // 3000 start leader election
         if (port == portNums.get(0)) {
             ballotNum++;
             Packet packet = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port);
             sendPacketToAll(packet);
         }
+
+        */
 /*
         //send heartbeat thread
         for(int i=0; i<outgoingSockets.size(); i++) {
@@ -117,6 +121,16 @@ public class Client {
                 if (splitted[0].equals("buy")) {
                     int numOfTickets = Integer.parseInt(splitted[1]);
                     // if i am the leader, send accept msg
+
+                    System.out.println("The size of the liveCenter is " + portNums.size());
+                    if(!portNums.contains(leaderPid)) {
+                        Client.ballotNum++;
+                        Packet packet = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port);
+                        sendPacketToAll(packet);
+                    }
+
+                    System.out.println("The leaderPid is " + Client.leaderPid);
+
                     if(Client.port == leaderPid) {
                         if(Client.resTicket < numOfTickets) {
                             System.out.println("The remaining tickets are not enough!");
@@ -274,6 +288,7 @@ class sendHeartbeatThread implements Runnable {
                 Client.sendPacket(clientSocket, packet);
             } catch (InterruptedException e) {
                 flag = false;
+                Client.portNums.remove(new Integer(clientSocket.getPort()));
                 e.printStackTrace();
             }
         }
