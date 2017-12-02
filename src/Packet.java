@@ -1,4 +1,5 @@
 import java.io.Serializable;
+import java.util.List;
 
 public class Packet implements Serializable {
 
@@ -13,15 +14,15 @@ public class Packet implements Serializable {
 
     private int sender;
 
+    private List<String> pair;
 
-
-    public Packet(String type,int ballotNum, int acceptNum, int acceptVal, int sender) {
+    public Packet(String type,int ballotNum, int acceptNum, int acceptVal, int sender, List<String> pair) {
         this.type = type;
         this.ballotNum = ballotNum;
         this.acceptNum = acceptNum;
         this.acceptVal = acceptVal;
         this.sender = sender;
-
+        this.pair = pair;
     }
 
 
@@ -46,6 +47,7 @@ public class Packet implements Serializable {
         return acceptVal;
     }
 
+    public List<String> getPair() { return pair; }
 
     public void printPacket() {
         System.out.println("THE PACKET: ");

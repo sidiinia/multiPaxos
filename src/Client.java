@@ -6,9 +6,12 @@ import java.util.concurrent.Semaphore;
 import static java.lang.Thread.sleep;
 
 public class Client {
+    static String host;
     static int port;
+    static List<String> pair;
     //static int[] portNums;
-    static ArrayList<Integer> portNums;
+    //static ArrayList<Integer> portNums = new ArrayList<>();
+    static List<List<String>> portNums = new ArrayList<>();
 
     static int leaderPid; // leader election
     static int counter = 0; // count ack back, to compare with majority
@@ -31,8 +34,8 @@ public class Client {
 
 
     public static void main(String[] args) throws IOException, ClassNotFoundException {
-        if (args.length < 1) {
-            System.out.println("please specify port num");
+        if (args.length < 2) {
+            System.out.println("please specify host ip and port num");
             System.exit(0);
         }
 
@@ -42,22 +45,24 @@ public class Client {
         sc.close();
         String[] ports = line.split(" ");
         //portNums = new int[ports.length];
-        portNums = new ArrayList<>();
         for (int i = 0; i < ports.length; i++) {
             //portNums[i] = Integer.parseInt(ports[i]);
-            portNums.add(Integer.parseInt(ports[i]));
+            String[] pair = ports[i].split("-");
+            portNums.add(Arrays.asList(pair));
         }
 
-        port = Integer.parseInt(args[0]);
+        host = args[0];
+        port = Integer.parseInt(args[1]);
+        pair = Arrays.asList(args);
         // if port is in config file, it is old config
-        if (portNums.contains(new Integer((port)))) {
+        if (portNums.contains(pair)) {
             CreateServerSocket ss = new CreateServerSocket(port);
             ss.start();
 
             // check if server exists, if exists, connect clients, else wait
             for (int i = 0; i < portNums.size(); i++) {
-                if (portNums.get(i) != port) {
-                    while (!serverListening("127.0.0.1", portNums.get(i))) {
+                if (!portNums.get(i).equals(pair)) {
+                    while (!serverListening(portNums.get(i).get(0), Integer.parseInt(portNums.get(i).get(1)))) {
                     }
                     //Socket s = new Socket("127.0.0.1", portNums.get(i));
                     //outgoingSockets.add(s);
@@ -70,11 +75,12 @@ public class Client {
             CreateServerSocket ss = new CreateServerSocket(port);
             ss.start();
             for (int i = 0; i < portNums.size(); i++) {
-                Socket s = new Socket("127.0.0.1", portNums.get(i));
+                Socket s = new Socket(portNums.get(i).get(0), Integer.parseInt(portNums.get(i).get(1)));
                 outgoingSockets.add(s);
             }
-            Packet p = new Packet("NewConfig", 0, 0, 0, port);
+            Packet p = new Packet("NewConfig", 0, 0, 0, port, pair);
             sendPacketToAll(p);
+
         }
 
 
@@ -89,11 +95,11 @@ public class Client {
         }
 
         //read
-        for (int i = 0; i < incomingSockets.size(); i++) {
+        /*for (int i = 0; i < incomingSockets.size(); i++) {
             ReadThread r1 = new ReadThread(incomingSockets.get(i));
             Thread t = new Thread(r1);
             t.start();
-        }
+        }*/
 /*
         //send heartbeat thread
         for(int i=0; i<outgoingSockets.size(); i++) {
@@ -127,34 +133,34 @@ public class Client {
                     // check if leader exists
                     if (leaderPid == 0) {
                         ballotNum++;
-                        Packet packet = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port);
+                        Packet packet = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port, pair);
                         sendPacketToAll(packet);
                         while (!phaseOneFinished || leaderPid == 0) {}
                     }
 
                     int numOfTickets = Integer.parseInt(splitted[1]);
                     // if i am the leader, send accept msg
-                    if(Client.port == leaderPid) {
-                        if(Client.resTicket < numOfTickets) {
+                    if(port == leaderPid) {
+                        if(resTicket < numOfTickets) {
                             System.out.println("The remaining tickets are not enough!");
                         }
                         else {
-                            Client.ballotNum++;
-                            Client.acceptNum = Client.ballotNum;
-                            Client.acceptVal = numOfTickets;
-                            Packet acceptPacket = new Packet("AcceptFromLeader", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
-                            Client.incrementCounterAccept = true;
+                            ballotNum++;
+                            acceptNum = ballotNum;
+                            acceptVal = numOfTickets;
+                            Packet acceptPacket = new Packet("AcceptFromLeader", ballotNum, acceptNum, acceptVal, port, pair);
+                            incrementCounterAccept = true;
                             sendPacketToAll(acceptPacket);
                         }
                     }
 
                     //if i am not the leader, send msg to the leader
                     else {
-                        if(Client.resTicket < numOfTickets) {
+                        if(resTicket < numOfTickets) {
                             System.out.println("The remaining tickets are not enough!");
                         }
                         else {
-                            Packet packet = new Packet("Request", Client.ballotNum, Client.acceptNum, numOfTickets, Client.port);
+                            Packet packet = new Packet("Request", ballotNum, acceptNum, numOfTickets, port, pair);
                             sendPacketToLeader(packet);
                         }
                     }
@@ -170,6 +176,11 @@ public class Client {
                     System.out.println();
 
                 }
+
+                else if (splitted[0].equals("leader")) {
+                    System.out.println("Current leader is " + leaderPid);
+                }
+
                 else {
 
                 }
@@ -204,7 +215,7 @@ public class Client {
     public static void sendPrepare() {
         for (int i = 0; i < outgoingSockets.size(); i++) {
             Socket clientSocket = outgoingSockets.get(i);
-            Packet packet = new Packet("Prepare", 0, 0, 0, port);
+            Packet packet = new Packet("Prepare", 0, 0, 0, port, pair);
 
             try {
                 ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
@@ -224,8 +235,9 @@ public class Client {
             outStream.writeObject(packet);
 
         } catch (IOException e) {
-            if(Client.portNums.contains(socket.getPort())) {
-                portNums.remove(new Integer(socket.getPort()));
+            List<String> pair = Arrays.asList(socket.getInetAddress().getHostAddress(), String.valueOf(socket.getPort()));
+            if(Client.portNums.contains(pair)) {
+                portNums.remove(pair);
                 outgoingSockets.remove(socket);
                 System.out.println("Removing " + socket.getPort());
                 //System.out.println("The size of portNum is " + Client.portNums.size());
@@ -233,7 +245,7 @@ public class Client {
                 if (socket.getPort() == Client.leaderPid) {
                     System.out.println("detected leader failure, restart phase 1");
                     ballotNum++;
-                    Packet p = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port);
+                    Packet p = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port, pair);
                     sendPacketToAll(p);
                 } else {
                     System.out.println("detected non-leader failure");
@@ -285,7 +297,7 @@ class sendHeartbeatThread implements Runnable {
     }
 
     public void run() {
-        Packet packet = new Packet("HeartBeat", -1, -1, -1, Client.port);
+        Packet packet = new Packet("HeartBeat", -1, -1, -1, Client.port, Client.pair);
         while (flag) {
             try {
                 sleep(3000);

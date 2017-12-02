@@ -28,12 +28,12 @@ class ReadThread implements Runnable {
                 if(packet.getType().equals("Prepare")) {
                     System.out.println("received Prepare!");
                     if(packet.getBallotNum() > Client.ballotNum ||
-                            (packet.getBallotNum() == Client.ballotNum && packet.getSender() < Client.port)) {
+                            (packet.getBallotNum() == Client.ballotNum && packet.getSender() > Client.port)) {
                         Client.ballotNum = packet.getBallotNum();
-                        Packet ackPacket = new Packet("Ack", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
+                        Packet ackPacket = new Packet("Ack", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
                         //ackPacket.printPacket();
                         Client.sendPacketToPort(ackPacket, packet.getSender());
-                        Client.leaderPid = packet.getSender();  // wrong
+                        //Client.leaderPid = packet.getSender();  // wrong
                     }
                 }
 
@@ -46,14 +46,26 @@ class ReadThread implements Runnable {
                         if (Client.counter >= (int) Math.ceil((double) Client.portNums.size() + 1) / 2 - 1) {
                             System.out.println(Client.port + " has been elected leader!!!");
                             Client.leaderPid = Client.port;
-                            //Packet p = new Packet("SetLeader", 0, 0, 0, Client.port);
-                            //Client.sendPacketToAll(p);
+                            Packet p = new Packet("SetLeader", 0, 0, 0, Client.port, Client.pair);
+                            Client.sendPacketToAll(p);
                             Client.incrementCounter = false;
                             Client.counter = 0;
-                            Client.phaseOneFinished = true;
+                            //Client.phaseOneFinished = true;
                         }
                     }
                     semaphore.release();
+                }
+
+                else if (packet.getType().equals("SetLeader")) {
+                    System.out.println("received SetLeader!");
+                    Client.leaderPid = packet.getSender();
+                    Packet p = new Packet("SetLeaderAck", 0, 0, 0, Client.port, Client.pair);
+                    Client.sendPacketToLeader(p);
+                }
+
+                else if (packet.getType().equals("SetLeaderAck")) {
+                    System.out.println("received SetLeaderAck!");
+                    Client.phaseOneFinished = true;
                 }
 
                 //if receiving "AcceptFromLeader", decide if I will accept this value or not
@@ -63,7 +75,7 @@ class ReadThread implements Runnable {
                         Client.ballotNum = packet.getBallotNum();
                         Client.acceptNum = packet.getBallotNum();
                         Client.acceptVal = packet.getAcceptVal();
-                        Packet ackAcceptPacket = new Packet("AcceptFromAcceptor", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
+                        Packet ackAcceptPacket = new Packet("AcceptFromAcceptor", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
                         ackAcceptPacket.printPacket();
                         Client.sendPacketToLeader(ackAcceptPacket);
                     }
@@ -76,7 +88,7 @@ class ReadThread implements Runnable {
                     if(Client.incrementCounterAccept) {
                         Client.counterAccept++;
                         if(Client.counterAccept >= (int)Math.ceil((double)Client.portNums.size()+1)/2 -1) {
-                            Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
+                            Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
                             decisionPacket.printPacket();
                             Client.sendPacketToAll(decisionPacket);
                             Client.log.add(packet.getAcceptVal()); // update leader's log
@@ -95,7 +107,7 @@ class ReadThread implements Runnable {
                     Client.ballotNum++; //increment leader's ballotnum
                     Client.acceptNum = Client.ballotNum;
                     Client.acceptVal = packet.getAcceptVal();
-                    Packet acceptPacket = new Packet("AcceptFromLeader", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
+                    Packet acceptPacket = new Packet("AcceptFromLeader", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
                     acceptPacket.printPacket();
                     Client.incrementCounterAccept = true;
                     Client.sendPacketToAll(acceptPacket);
@@ -113,8 +125,23 @@ class ReadThread implements Runnable {
 
                 }
 
+                // adding new config
                 else if (packet.getType().equals("NewConfig")) {
                     System.out.println("RECEIVED NEWCONFIG");
+                    Client.portNums.add(packet.getPair());
+                    Socket socket = new Socket("127.0.0.1", packet.getSender());
+                    Client.outgoingSockets.add(socket);
+
+                    // start heartbeat
+                    try {
+                        sendHeartbeatThread h1 = new sendHeartbeatThread(socket);
+                        Thread t = new Thread(h1);
+                        t.start();
+                    } catch (Exception e) {
+
+                    }
+
+                    // check leader???
                 }
 
                 else {
