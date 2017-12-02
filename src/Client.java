@@ -1,6 +1,5 @@
 import java.io.*;
 import java.net.Socket;
-import java.net.SocketException;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
@@ -25,6 +24,7 @@ public class Client {
     static volatile int acceptNum;
     static volatile int acceptVal;
 
+    static volatile boolean phaseOneFinished = false;
 
     static volatile List<Socket> incomingSockets = new ArrayList<>();
     static volatile List<Socket> outgoingSockets = new ArrayList<>();
@@ -35,8 +35,6 @@ public class Client {
             System.out.println("please specify port num");
             System.exit(0);
         }
-
-        port = Integer.parseInt(args[0]);
 
         // read in config file which contains port num
         Scanner sc = new Scanner(new File("config.txt"));
@@ -50,23 +48,40 @@ public class Client {
             portNums.add(Integer.parseInt(ports[i]));
         }
 
-        CreateServerSocket ss = new CreateServerSocket(port);
-        ss.start();
+        port = Integer.parseInt(args[0]);
+        // if port is in config file, it is old config
+        if (portNums.contains(new Integer((port)))) {
+            CreateServerSocket ss = new CreateServerSocket(port);
+            ss.start();
 
-        // check if server exists, if exists, connect clients, else wait
-        for (int i = 0; i < portNums.size(); i++) {
-            if (portNums.get(i) != port) {
-                while (!serverListening("127.0.0.1", portNums.get(i))) {
+            // check if server exists, if exists, connect clients, else wait
+            for (int i = 0; i < portNums.size(); i++) {
+                if (portNums.get(i) != port) {
+                    while (!serverListening("127.0.0.1", portNums.get(i))) {
+                    }
+                    //Socket s = new Socket("127.0.0.1", portNums.get(i));
+                    //outgoingSockets.add(s);
                 }
+            }
+        }
+
+        // if port is new config
+        else {
+            CreateServerSocket ss = new CreateServerSocket(port);
+            ss.start();
+            for (int i = 0; i < portNums.size(); i++) {
                 Socket s = new Socket("127.0.0.1", portNums.get(i));
                 outgoingSockets.add(s);
             }
+            Packet p = new Packet("NewConfig", 0, 0, 0, port);
+            sendPacketToAll(p);
         }
 
 
         // wait for all the clients to come in
-        while (incomingSockets.size() != 2 * (portNums.size() - 1)) {
-        }
+        //while (incomingSockets.size() != 2 * (portNums.size() - 1)) {
+        //}
+        while (incomingSockets.size() != portNums.size() -1) {}
         for (int i = 0; i < incomingSockets.size(); i++) {
             if (incomingSockets.get(i).isClosed()) {
                 incomingSockets.remove(incomingSockets.get(i));
@@ -78,13 +93,6 @@ public class Client {
             ReadThread r1 = new ReadThread(incomingSockets.get(i));
             Thread t = new Thread(r1);
             t.start();
-        }
-
-        // 3000 start leader election
-        if (port == portNums.get(0)) {
-            ballotNum++;
-            Packet packet = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port);
-            sendPacketToAll(packet);
         }
 /*
         //send heartbeat thread
@@ -115,6 +123,15 @@ public class Client {
                 clientCommand = br.readLine();
                 String[] splitted = clientCommand.split("\\s+");
                 if (splitted[0].equals("buy")) {
+
+                    // check if leader exists
+                    if (leaderPid == 0) {
+                        ballotNum++;
+                        Packet packet = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port);
+                        sendPacketToAll(packet);
+                        while (!phaseOneFinished || leaderPid == 0) {}
+                    }
+
                     int numOfTickets = Integer.parseInt(splitted[1]);
                     // if i am the leader, send accept msg
                     if(Client.port == leaderPid) {
@@ -169,16 +186,17 @@ public class Client {
         Socket s = null;
         try {
             s = new Socket(host, port);
+            Client.outgoingSockets.add(s);
             return true;
         } catch (Exception e) {
             return false;
-        } finally {
+        } /*finally {
             if (s != null)
                 try {
                     s.close();
                 } catch (Exception e) {
                 }
-        }
+        }*/
     }
 
 

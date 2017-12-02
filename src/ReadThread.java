@@ -1,6 +1,7 @@
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.StreamCorruptedException;
 import java.net.Socket;
 import java.util.concurrent.Semaphore;
 
@@ -18,10 +19,9 @@ class ReadThread implements Runnable {
     public void run() {
         while (true) {
             Packet packet;
-            ObjectInputStream inStream;
             try {
                 //System.out.println("reading from " + clientSocket);
-                inStream = new ObjectInputStream(clientSocket.getInputStream());
+                ObjectInputStream inStream = new ObjectInputStream(clientSocket.getInputStream());
                 packet = (Packet) inStream.readObject();
 
                 //if receiving "Prepare", then leader election
@@ -33,28 +33,27 @@ class ReadThread implements Runnable {
                         Packet ackPacket = new Packet("Ack", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port);
                         //ackPacket.printPacket();
                         Client.sendPacketToPort(ackPacket, packet.getSender());
+                        Client.leaderPid = packet.getSender();  // wrong
                     }
                 }
+
                 //if receiving "Ack", the client agrees that I could be the leader
                 else if(packet.getType().equals("Ack")) {
                     System.out.println("received Ack!");
+                    semaphore.acquire();
                     if (Client.incrementCounter) {
                         Client.counter++;
                         if (Client.counter >= (int) Math.ceil((double) Client.portNums.size() + 1) / 2 - 1) {
                             System.out.println(Client.port + " has been elected leader!!!");
                             Client.leaderPid = Client.port;
-                            Packet p = new Packet("SetLeader", 0, 0, 0, Client.port);
-                            Client.sendPacketToAll(p);
+                            //Packet p = new Packet("SetLeader", 0, 0, 0, Client.port);
+                            //Client.sendPacketToAll(p);
                             Client.incrementCounter = false;
                             Client.counter = 0;
+                            Client.phaseOneFinished = true;
                         }
                     }
-                }
-
-                // if received "SetLeader", set leader to the port where the packet is coming from
-                else if (packet.getType().equals("SetLeader")) {
-                    System.out.println("received SetLeader");
-                    Client.leaderPid = packet.getSender();
+                    semaphore.release();
                 }
 
                 //if receiving "AcceptFromLeader", decide if I will accept this value or not
@@ -114,6 +113,14 @@ class ReadThread implements Runnable {
 
                 }
 
+                else if (packet.getType().equals("NewConfig")) {
+                    System.out.println("RECEIVED NEWCONFIG");
+                }
+
+                else {
+                    System.out.println("received an unknown packet");
+                }
+
                 try {
                     sleep(1000);
                 } catch (InterruptedException e) {
@@ -122,6 +129,8 @@ class ReadThread implements Runnable {
 
             } catch (EOFException e) {
                 //System.out.println("here");
+            } catch (StreamCorruptedException e) {
+
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (ClassNotFoundException e) {
