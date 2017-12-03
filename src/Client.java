@@ -1,4 +1,5 @@
 import java.io.*;
+import java.net.ConnectException;
 import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.Semaphore;
@@ -75,8 +76,12 @@ public class Client {
             CreateServerSocket ss = new CreateServerSocket(port);
             ss.start();
             for (int i = 0; i < portNums.size(); i++) {
-                Socket s = new Socket(portNums.get(i).get(0), Integer.parseInt(portNums.get(i).get(1)));
-                outgoingSockets.add(s);
+                try {
+                    Socket s = new Socket(portNums.get(i).get(0), Integer.parseInt(portNums.get(i).get(1)));
+                    outgoingSockets.add(s);
+                } catch (ConnectException e) {
+
+                }
             }
             Packet p = new Packet("NewConfig", 0, 0, 0, port, pair);
             sendPacketToAll(p);
@@ -185,6 +190,9 @@ public class Client {
 
                 }
             }
+
+        } catch (ConnectException e) {
+
         } catch (IOException e) {
 
         }
