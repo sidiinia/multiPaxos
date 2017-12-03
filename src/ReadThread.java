@@ -129,7 +129,7 @@ class ReadThread implements Runnable {
                 else if (packet.getType().equals("NewConfig")) {
                     System.out.println("RECEIVED NEWCONFIG");
                     Client.portNums.add(packet.getPair());
-                    Socket socket = new Socket("127.0.0.1", packet.getSender());
+                    Socket socket = new Socket(packet.getPair().get(0), Integer.parseInt(packet.getPair().get(1)));
                     Client.outgoingSockets.add(socket);
 
                     // start heartbeat
