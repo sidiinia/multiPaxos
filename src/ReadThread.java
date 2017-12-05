@@ -91,7 +91,7 @@ class ReadThread implements Runnable {
                             Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
                             decisionPacket.printPacket();
                             Client.sendPacketToAll(decisionPacket);
-                            Client.log.add(packet.getAcceptVal()); // update leader's log
+                            Client.log.add(Integer.toString(packet.getAcceptVal())); // update leader's log
                             Client.resTicket -= packet.getAcceptVal();
                             Client.incrementCounterAccept = false;
                             Client.counterAccept = 0;
@@ -115,7 +115,7 @@ class ReadThread implements Runnable {
 
                 else if(packet.getType().equals("Decision")) {
                     System.out.println("received Decision!");
-                    Client.log.add(packet.getAcceptVal());
+                    Client.log.add(Integer.toString(packet.getAcceptVal()));
                     Client.resTicket -= packet.getAcceptVal();
                 }
 

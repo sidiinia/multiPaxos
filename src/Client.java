@@ -20,7 +20,8 @@ public class Client {
     static int counterAccept = 0; //leader counts how many accept received
     static boolean incrementCounterAccept = false; //flag to see if needs to increment counterAccept or not
     static int resTicket = 100;
-    static List<Integer> log = new ArrayList<>();
+    //static List<Integer> log = new ArrayList<>();
+    static List<String> log = new ArrayList<>();
     //static List<Socket> liveCenter = new ArrayList<>(); // live center to check which servers are alive
     static int quorumSize = 0;
 
