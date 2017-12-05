@@ -79,6 +79,7 @@ public class Client {
 
         // if port is new config
         else {
+            portNums.add(pair);
             CreateServerSocket ss = new CreateServerSocket(port);
             ss.start();
             for (int i = 0; i < portNums.size(); i++) {
