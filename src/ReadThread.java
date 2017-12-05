@@ -32,7 +32,7 @@ class ReadThread implements Runnable {
                         Client.ballotNum = packet.getBallotNum();
                         Packet ackPacket = new Packet("Ack", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
                         //ackPacket.printPacket();
-                        Client.sendPacketToPort(ackPacket, packet.getSender());
+                        Client.sendPacketToPort(ackPacket, packet.getPair());
                         //Client.leaderPid = packet.getSender();  // wrong
                     }
                 }
@@ -45,7 +45,8 @@ class ReadThread implements Runnable {
                         Client.counter++;
                         if (Client.counter >= Client.quorumSize - 1) {
                             System.out.println(Client.port + " has been elected leader!!!");
-                            Client.leaderPid = Client.port;
+                            Client.leaderPid[0] = Client.host;
+                            Client.leaderPid[1] = Integer.toString(Client.port);
                             Packet p = new Packet("SetLeader", 0, 0, 0, Client.port, Client.pair);
                             Client.sendPacketToAll(p);
                             Client.incrementCounter = false;
@@ -58,7 +59,8 @@ class ReadThread implements Runnable {
 
                 else if (packet.getType().equals("SetLeader")) {
                     System.out.println("received SetLeader!");
-                    Client.leaderPid = packet.getSender();
+                    Client.leaderPid[0] = packet.getPair().get(0);
+                    Client.leaderPid[1] = Integer.toString(packet.getSender());
                     Packet p = new Packet("SetLeaderAck", 0, 0, 0, Client.port, Client.pair);
                     Client.sendPacketToLeader(p);
                 }
@@ -142,6 +144,7 @@ class ReadThread implements Runnable {
                     }
 
                     // check leader???
+
                 }
 
                 else {

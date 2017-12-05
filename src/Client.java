@@ -1,6 +1,9 @@
 import java.io.*;
 import java.net.ConnectException;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
@@ -14,7 +17,7 @@ public class Client {
     //static ArrayList<Integer> portNums = new ArrayList<>();
     static List<List<String>> portNums = new ArrayList<>();
 
-    static int leaderPid; // leader election
+    static String[] leaderPid = new String[2]; // leader election
     static int counter = 0; // count ack back, to compare with majority
     static boolean incrementCounter = true;
     static int counterAccept = 0; //leader counts how many accept received
@@ -88,6 +91,11 @@ public class Client {
             }
             Packet p = new Packet("NewConfig", 0, 0, 0, port, pair);
             sendPacketToAll(p);
+            try {
+                Files.write(Paths.get("config.txt"), (' '+args[0]+'-'+args[1]).getBytes(), StandardOpenOption.APPEND);
+            } catch (IOException e) {
+                //exception handling left as an exercise for the reader
+            }
 
         }
 
@@ -139,16 +147,16 @@ public class Client {
                 if (splitted[0].equals("buy")) {
 
                     // check if leader exists
-                    if (leaderPid == 0) {
+                    if (leaderPid[0] == null) {
                         ballotNum++;
                         Packet packet = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port, pair);
                         sendPacketToAll(packet);
-                        while (!phaseOneFinished || leaderPid == 0) {}
+                        while (!phaseOneFinished || leaderPid[0] == null) {}
                     }
 
                     int numOfTickets = Integer.parseInt(splitted[1]);
                     // if i am the leader, send accept msg
-                    if(port == leaderPid) {
+                    if(host.equals(leaderPid[0]) && port == Integer.parseInt(leaderPid[1])) {
                         if(resTicket < numOfTickets) {
                             System.out.println("The remaining tickets are not enough!");
                         }
@@ -253,7 +261,8 @@ public class Client {
                 System.out.println("Removing " + socket.getPort());
                 //System.out.println("The size of portNum is " + Client.portNums.size());
 
-                if (socket.getPort() == Client.leaderPid) {
+                if (socket.getInetAddress().getHostAddress().equals(leaderPid[0]) &&
+                        socket.getPort() == Integer.parseInt(leaderPid[1])) {
                     System.out.println("detected leader failure, restart phase 1");
                     ballotNum++;
                     Packet p = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port, pair);
@@ -274,10 +283,11 @@ public class Client {
         }
     }
 
-    public static void sendPacketToPort(Packet packet, int port) {
+    public static void sendPacketToPort(Packet packet, List<String> pair) {
         for (int i = 0; i < outgoingSockets.size(); i++) {
             Socket socket = outgoingSockets.get(i);
-            if (socket.getPort() == port) {
+            if (socket.getInetAddress().getHostAddress().equals(pair.get(0)) &&
+                    socket.getPort() == Integer.parseInt(pair.get(1))) {
                 sendPacket(socket, packet);
             }
         }
@@ -286,7 +296,8 @@ public class Client {
     public static void sendPacketToLeader(Packet packet) {
         for(int i=0; i<outgoingSockets.size(); i++) {
             Socket leaderSocket = outgoingSockets.get(i);
-            if(leaderSocket.getPort() == leaderPid) {
+            if(leaderSocket.getInetAddress().getHostAddress().equals(leaderPid[0]) &&
+                    leaderSocket.getPort() == Integer.parseInt(leaderPid[1])) {
                 sendPacket(leaderSocket, packet);
             }
         }
