@@ -231,27 +231,12 @@ public class Client {
 
 
 
-    public static void sendPrepare() {
-        for (int i = 0; i < outgoingSockets.size(); i++) {
-            Socket clientSocket = outgoingSockets.get(i);
-            Packet packet = new Packet("Prepare", 0, 0, 0, port, pair);
-
-            try {
-                ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
-                outStream.writeObject(packet);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-
 
     public static void sendPacket(Socket socket , Packet packet) {
 
         try {
             ObjectOutputStream outStream = new ObjectOutputStream(socket.getOutputStream());
-            outStream.writeObject(packet);
+            outStream.writeObject((Object) packet);
 
         } catch (IOException e) {
             List<String> pair = Arrays.asList(socket.getInetAddress().getHostAddress(), String.valueOf(socket.getPort()));
