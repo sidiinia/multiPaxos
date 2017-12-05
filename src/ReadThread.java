@@ -43,7 +43,7 @@ class ReadThread implements Runnable {
                     semaphore.acquire();
                     if (Client.incrementCounter) {
                         Client.counter++;
-                        if (Client.counter >= (int) Math.ceil((double) Client.portNums.size() + 1) / 2 - 1) {
+                        if (Client.counter >= Client.quorumSize - 1) {
                             System.out.println(Client.port + " has been elected leader!!!");
                             Client.leaderPid = Client.port;
                             Packet p = new Packet("SetLeader", 0, 0, 0, Client.port, Client.pair);
@@ -87,7 +87,7 @@ class ReadThread implements Runnable {
                     semaphore.acquire();
                     if(Client.incrementCounterAccept) {
                         Client.counterAccept++;
-                        if(Client.counterAccept >= (int)Math.ceil((double)Client.portNums.size()+1)/2 -1) {
+                        if(Client.counterAccept >= Client.quorumSize-1) {
                             Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
                             decisionPacket.printPacket();
                             Client.sendPacketToAll(decisionPacket);

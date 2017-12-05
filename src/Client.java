@@ -22,6 +22,7 @@ public class Client {
     static int resTicket = 100;
     static List<Integer> log = new ArrayList<>();
     //static List<Socket> liveCenter = new ArrayList<>(); // live center to check which servers are alive
+    static int quorumSize = 0;
 
 
     static volatile int ballotNum;
@@ -52,6 +53,7 @@ public class Client {
             portNums.add(Arrays.asList(pair));
         }
 
+        quorumSize = (int)Math.ceil((double)Client.portNums.size()+1)/2;
         host = args[0];
         port = Integer.parseInt(args[1]);
         pair = Arrays.asList(args);
