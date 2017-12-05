@@ -93,7 +93,7 @@ class ReadThread implements Runnable {
                                 Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
                                 decisionPacket.printPacket();
                                 Client.sendPacketToAll(decisionPacket);
-                                Client.log.add(Integer.toString(packet.getAcceptVal())); // update leader's log
+                                Client.log.add("Sold "+ Integer.toString(packet.getAcceptVal())+ " tickets"); // update leader's log
                                 Client.resTicket -= packet.getAcceptVal();
                                 Client.incrementCounterAccept = false;
                                 Client.counterAccept = 0;
@@ -117,7 +117,7 @@ class ReadThread implements Runnable {
 
                     else if(packet.getType().equals("Decision")) {
                         System.out.println("received Decision!");
-                        Client.log.add(Integer.toString(packet.getAcceptVal()));
+                        Client.log.add("Sold "+Integer.toString(packet.getAcceptVal()) + " tickets");
                         Client.resTicket -= packet.getAcceptVal();
                     }
 
@@ -133,6 +133,9 @@ class ReadThread implements Runnable {
                         Client.portNums.add(packet.getPair());
                         Socket socket = new Socket(packet.getPair().get(0), Integer.parseInt(packet.getPair().get(1)));
                         Client.outgoingSockets.add(socket);
+
+                        //add config change to the log
+                        Client.log.add("Config Change - ADD "+packet.getPair().get(0)+"-"+packet.getPair().get(1));
 
                         // start heartbeat
                         try {

@@ -188,7 +188,7 @@ public class Client {
                     System.out.println("Remaining tickets " + Client.resTicket);
                     System.out.println("The log: ");
                     for(int i=0; i<log.size(); i++) {
-                        System.out.print(log.get(i) + " ");
+                        System.out.println("    "+log.get(i) + " ");
                     }
                     System.out.println();
 
