@@ -30,7 +30,7 @@ class ReadThread implements Runnable {
                         if(packet.getBallotNum() > Client.ballotNum ||
                                 (packet.getBallotNum() == Client.ballotNum && packet.getSender() > Client.port)) {
                             Client.ballotNum = packet.getBallotNum();
-                            Packet ackPacket = new Packet("Ack", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
+                            Packet ackPacket = new Packet("Ack", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair, -1);
                             //ackPacket.printPacket();
                             Client.sendPacketToPort(ackPacket, packet.getPair());
                             //Client.leaderPid = packet.getSender();  // wrong
@@ -47,7 +47,7 @@ class ReadThread implements Runnable {
                                 System.out.println(Client.port + " has been elected leader!!!");
                                 Client.leaderPid[0] = Client.host;
                                 Client.leaderPid[1] = Integer.toString(Client.port);
-                                Packet p = new Packet("SetLeader", 0, 0, 0, Client.port, Client.pair);
+                                Packet p = new Packet("SetLeader", 0, 0, 0, Client.port, Client.pair, -1);
                                 Client.sendPacketToAll(p);
                                 Client.incrementCounter = false;
                                 Client.counter = 0;
@@ -61,7 +61,7 @@ class ReadThread implements Runnable {
                         System.out.println("received SetLeader!");
                         Client.leaderPid[0] = packet.getPair().get(0);
                         Client.leaderPid[1] = Integer.toString(packet.getSender());
-                        Packet p = new Packet("SetLeaderAck", 0, 0, 0, Client.port, Client.pair);
+                        Packet p = new Packet("SetLeaderAck", 0, 0, 0, Client.port, Client.pair, -1);
                         Client.sendPacketToLeader(p);
                     }
 
@@ -77,8 +77,9 @@ class ReadThread implements Runnable {
                             Client.ballotNum = packet.getBallotNum();
                             Client.acceptNum = packet.getBallotNum();
                             Client.acceptVal = packet.getAcceptVal();
-                            Packet ackAcceptPacket = new Packet("AcceptFromAcceptor", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
-                            ackAcceptPacket.printPacket();
+                            Client.firstUnchosenIndex = packet.getIndex()+1;
+                            Packet ackAcceptPacket = new Packet("AcceptFromAcceptor", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair, -1);
+                            //ackAcceptPacket.printPacket();
                             Client.sendPacketToLeader(ackAcceptPacket);
                         }
                     }
@@ -90,8 +91,8 @@ class ReadThread implements Runnable {
                         if(Client.incrementCounterAccept) {
                             Client.counterAccept++;
                             if(Client.counterAccept >= Client.quorumSize-1) {
-                                Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
-                                decisionPacket.printPacket();
+                                Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair, -1);
+                                //decisionPacket.printPacket();
                                 Client.sendPacketToAll(decisionPacket);
                                 Client.log.add("Sold "+ Integer.toString(packet.getAcceptVal())+ " tickets"); // update leader's log
                                 Client.resTicket -= packet.getAcceptVal();
@@ -109,8 +110,9 @@ class ReadThread implements Runnable {
                         Client.ballotNum++; //increment leader's ballotnum
                         Client.acceptNum = Client.ballotNum;
                         Client.acceptVal = packet.getAcceptVal();
-                        Packet acceptPacket = new Packet("AcceptFromLeader", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair);
-                        acceptPacket.printPacket();
+                        Packet acceptPacket = new Packet("AcceptFromLeader", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair, Client.firstUnchosenIndex);
+                        Client.firstUnchosenIndex++;
+                        //acceptPacket.printPacket();
                         Client.incrementCounterAccept = true;
                         Client.sendPacketToAll(acceptPacket);
                     }

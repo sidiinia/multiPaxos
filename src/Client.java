@@ -28,6 +28,8 @@ public class Client {
     //static List<Socket> liveCenter = new ArrayList<>(); // live center to check which servers are alive
     static int quorumSize = 0;
 
+    static int firstUnchosenIndex = 0;
+
 
     static volatile int ballotNum;
     static volatile int acceptNum;
@@ -90,7 +92,7 @@ public class Client {
 
                 }
             }
-            Packet p = new Packet("NewConfig", 0, 0, 0, port, pair);
+            Packet p = new Packet("NewConfig", 0, 0, 0, port, pair, -1);
             sendPacketToAll(p);
             try {
                 Files.write(Paths.get("config.txt"), (' '+args[0]+'-'+args[1]).getBytes(), StandardOpenOption.APPEND);
@@ -150,7 +152,7 @@ public class Client {
                     // check if leader exists
                     if (leaderPid[0] == null) {
                         ballotNum++;
-                        Packet packet = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port, pair);
+                        Packet packet = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port, pair, -1);
                         sendPacketToAll(packet);
                         while (!phaseOneFinished || leaderPid[0] == null) {}
                     }
@@ -165,7 +167,8 @@ public class Client {
                             ballotNum++;
                             acceptNum = ballotNum;
                             acceptVal = numOfTickets;
-                            Packet acceptPacket = new Packet("AcceptFromLeader", ballotNum, acceptNum, acceptVal, port, pair);
+                            Packet acceptPacket = new Packet("AcceptFromLeader", ballotNum, acceptNum, acceptVal, port, pair, firstUnchosenIndex);
+                            firstUnchosenIndex++;
                             incrementCounterAccept = true;
                             sendPacketToAll(acceptPacket);
                         }
@@ -177,7 +180,7 @@ public class Client {
                             System.out.println("The remaining tickets are not enough!");
                         }
                         else {
-                            Packet packet = new Packet("Request", ballotNum, acceptNum, numOfTickets, port, pair);
+                            Packet packet = new Packet("Request", ballotNum, acceptNum, numOfTickets, port, pair, -1);
                             sendPacketToLeader(packet);
                         }
                     }
@@ -186,6 +189,7 @@ public class Client {
                     //show the state of the state machine
                     //show the committed logs
                     System.out.println("Remaining tickets " + Client.resTicket);
+                    System.out.println("first unchosen index is " + firstUnchosenIndex);
                     System.out.println("The log: ");
                     for(int i=0; i<log.size(); i++) {
                         System.out.println("    "+log.get(i) + " ");
@@ -251,7 +255,7 @@ public class Client {
                         socket.getPort() == Integer.parseInt(leaderPid[1])) {
                     System.out.println("detected leader failure, restart phase 1");
                     ballotNum++;
-                    Packet p = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port, pair);
+                    Packet p = new Packet("Prepare", ballotNum, acceptNum, acceptVal, port, pair, -1);
                     sendPacketToAll(p);
                 } else {
                     System.out.println("detected non-leader failure");
@@ -305,7 +309,7 @@ class sendHeartbeatThread implements Runnable {
     }
 
     public void run() {
-        Packet packet = new Packet("HeartBeat", -1, -1, -1, Client.port, Client.pair);
+        Packet packet = new Packet("HeartBeat", -1, -1, -1, Client.port, Client.pair, -1);
         while (flag) {
             try {
                 sleep(3000);

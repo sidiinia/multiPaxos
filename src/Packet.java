@@ -16,13 +16,16 @@ public class Packet implements Serializable {
 
     private List<String> pair;
 
-    public Packet(String type,int ballotNum, int acceptNum, int acceptVal, int sender, List<String> pair) {
+    private int index;
+
+    public Packet(String type,int ballotNum, int acceptNum, int acceptVal, int sender, List<String> pair, int index) {
         this.type = type;
         this.ballotNum = ballotNum;
         this.acceptNum = acceptNum;
         this.acceptVal = acceptVal;
         this.sender = sender;
         this.pair = pair;
+        this.index = index;
     }
 
 
@@ -48,6 +51,8 @@ public class Packet implements Serializable {
     }
 
     public List<String> getPair() { return pair; }
+
+    public int getIndex() { return index; }
 
     public void printPacket() {
         System.out.println("THE PACKET: ");
