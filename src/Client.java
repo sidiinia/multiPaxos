@@ -192,7 +192,7 @@ public class Client {
                 }
 
                 else if (splitted[0].equals("leader")) {
-                    System.out.println("Current leader is " + leaderPid);
+                    System.out.println("Current leader is " + leaderPid[0] + "-" + leaderPid[1]);
                 }
 
                 else {
