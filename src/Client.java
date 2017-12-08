@@ -13,8 +13,6 @@ public class Client {
     static String host;
     static int port;
     static List<String> pair;
-    //static int[] portNums;
-    //static ArrayList<Integer> portNums = new ArrayList<>();
     static List<List<String>> portNums = new ArrayList<>();
 
     static String[] leaderPid = new String[2]; // leader election
@@ -24,7 +22,8 @@ public class Client {
     static boolean incrementCounterAccept = false; //flag to see if needs to increment counterAccept or not
     static int resTicket = 100;
     //static List<Integer> log = new ArrayList<>();
-    static List<String> log = new ArrayList<>();
+    //static List<String> log = new ArrayList<>();
+    static Map<Integer, String> log = new HashMap<>();
     //static List<Socket> liveCenter = new ArrayList<>(); // live center to check which servers are alive
     static int quorumSize = 0;
 
@@ -52,9 +51,7 @@ public class Client {
         String line = sc.nextLine();
         sc.close();
         String[] ports = line.split(" ");
-        //portNums = new int[ports.length];
         for (int i = 0; i < ports.length; i++) {
-            //portNums[i] = Integer.parseInt(ports[i]);
             String[] pair = ports[i].split("-");
             portNums.add(Arrays.asList(pair));
         }
@@ -81,9 +78,9 @@ public class Client {
 
         // if port is new config
         else {
-            portNums.add(pair);
             CreateServerSocket ss = new CreateServerSocket(port);
             ss.start();
+            System.out.println(portNums.size());
             for (int i = 0; i < portNums.size(); i++) {
                 try {
                     Socket s = new Socket(portNums.get(i).get(0), Integer.parseInt(portNums.get(i).get(1)));
@@ -92,7 +89,9 @@ public class Client {
 
                 }
             }
-            Packet p = new Packet("NewConfig", 0, 0, 0, port, pair, -1);
+            portNums.add(pair);
+            Packet p = new Packet("NewConfig", 0, 0, 0, port, pair, firstUnchosenIndex);
+            firstUnchosenIndex++;
             sendPacketToAll(p);
             try {
                 Files.write(Paths.get("config.txt"), (' '+args[0]+'-'+args[1]).getBytes(), StandardOpenOption.APPEND);
@@ -107,11 +106,7 @@ public class Client {
         //while (incomingSockets.size() != 2 * (portNums.size() - 1)) {
         //}
         while (incomingSockets.size() != portNums.size() -1) {}
-        for (int i = 0; i < incomingSockets.size(); i++) {
-            if (incomingSockets.get(i).isClosed()) {
-                incomingSockets.remove(incomingSockets.get(i));
-            }
-        }
+        System.out.println("here");
 
         //read
         /*for (int i = 0; i < incomingSockets.size(); i++) {
@@ -266,7 +261,8 @@ public class Client {
 
 
     public static void sendPacketToAll(Packet packet) {
-        for(int i = 0; i<outgoingSockets.size(); i++) {
+        System.out.println("outgoingsocket size is "+outgoingSockets.size());
+        for(int i = 0; i < outgoingSockets.size(); i++) {
             Socket clientSocket = outgoingSockets.get(i);
 
             sendPacket(clientSocket, packet);

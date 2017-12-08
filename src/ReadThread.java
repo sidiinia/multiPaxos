@@ -94,7 +94,7 @@ class ReadThread implements Runnable {
                                 Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair, -1);
                                 //decisionPacket.printPacket();
                                 Client.sendPacketToAll(decisionPacket);
-                                Client.log.add("Sold "+ Integer.toString(packet.getAcceptVal())+ " tickets"); // update leader's log
+                                Client.log.put(Client.firstUnchosenIndex - 1,"Sold "+ Integer.toString(packet.getAcceptVal())+ " tickets"); // update leader's log
                                 Client.resTicket -= packet.getAcceptVal();
                                 Client.incrementCounterAccept = false;
                                 Client.counterAccept = 0;
@@ -119,7 +119,7 @@ class ReadThread implements Runnable {
 
                     else if(packet.getType().equals("Decision")) {
                         System.out.println("received Decision!");
-                        Client.log.add("Sold "+Integer.toString(packet.getAcceptVal()) + " tickets");
+                        Client.log.put(Client.firstUnchosenIndex - 1, "Sold "+Integer.toString(packet.getAcceptVal()) + " tickets");
                         Client.resTicket -= packet.getAcceptVal();
                     }
 
@@ -137,7 +137,8 @@ class ReadThread implements Runnable {
                         Client.outgoingSockets.add(socket);
 
                         //add config change to the log
-                        Client.log.add("Config Change - ADD "+packet.getPair().get(0)+"-"+packet.getPair().get(1));
+                        Client.log.put(packet.getIndex(),"Config Change - ADD "+packet.getPair().get(0)+"-"+packet.getPair().get(1));
+                        Client.firstUnchosenIndex = packet.getIndex() + 1;
 
                         // start heartbeat
                         try {

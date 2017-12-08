@@ -1,21 +1,22 @@
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 
 public class LogRep implements Serializable {
 
-    private List<String> log;
+    private Map<Integer, String> log;
     private String[] leaderPid;
     private String message;
     private int remainingTickets;
 
-    public LogRep(List<String> log, String[] leaderPid, String message, int remainingTickets) {
+    public LogRep(Map<Integer, String> log, String[] leaderPid, String message, int remainingTickets) {
         this.log = log;
         this.leaderPid = leaderPid;
         this.message = message;
         this.remainingTickets = remainingTickets;
     }
 
-    public List<String> getLog() {
+    public Map<Integer, String> getLog() {
         return log;
     }
 
