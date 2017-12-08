@@ -90,8 +90,7 @@ public class Client {
                 }
             }
             portNums.add(pair);
-            Packet p = new Packet("NewConfig", 0, 0, 0, port, pair, firstUnchosenIndex);
-            firstUnchosenIndex++;
+            Packet p = new Packet("NewConfig", 0, 0, 0, port, pair, -1);
             sendPacketToAll(p);
             try {
                 Files.write(Paths.get("config.txt"), (' '+args[0]+'-'+args[1]).getBytes(), StandardOpenOption.APPEND);
@@ -106,7 +105,6 @@ public class Client {
         //while (incomingSockets.size() != 2 * (portNums.size() - 1)) {
         //}
         while (incomingSockets.size() != portNums.size() -1) {}
-        System.out.println("here");
 
         //read
         /*for (int i = 0; i < incomingSockets.size(); i++) {
@@ -236,12 +234,12 @@ public class Client {
 
         try {
             ObjectOutputStream outStream = new ObjectOutputStream(socket.getOutputStream());
-            outStream.writeObject((Object) packet);
+            outStream.writeObject(packet);
 
         } catch (IOException e) {
-            List<String> pair = Arrays.asList(socket.getInetAddress().getHostAddress(), String.valueOf(socket.getPort()));
-            if(Client.portNums.contains(pair)) {
-                portNums.remove(pair);
+            List<String> pairToRemove = Arrays.asList(socket.getInetAddress().getHostAddress(), String.valueOf(socket.getPort()));
+            if(Client.portNums.contains(pairToRemove)) {
+                portNums.remove(pairToRemove);
                 outgoingSockets.remove(socket);
                 System.out.println("Removing " + socket.getPort());
                 //System.out.println("The size of portNum is " + Client.portNums.size());
@@ -261,7 +259,7 @@ public class Client {
 
 
     public static void sendPacketToAll(Packet packet) {
-        System.out.println("outgoingsocket size is "+outgoingSockets.size());
+
         for(int i = 0; i < outgoingSockets.size(); i++) {
             Socket clientSocket = outgoingSockets.get(i);
 

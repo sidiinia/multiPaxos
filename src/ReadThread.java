@@ -94,6 +94,7 @@ class ReadThread implements Runnable {
                                 Packet decisionPacket = new Packet("Decision", Client.ballotNum, Client.acceptNum, Client.acceptVal, Client.port, Client.pair, -1);
                                 //decisionPacket.printPacket();
                                 Client.sendPacketToAll(decisionPacket);
+                                System.out.println(Client.firstUnchosenIndex);
                                 Client.log.put(Client.firstUnchosenIndex - 1,"Sold "+ Integer.toString(packet.getAcceptVal())+ " tickets"); // update leader's log
                                 Client.resTicket -= packet.getAcceptVal();
                                 Client.incrementCounterAccept = false;
@@ -137,8 +138,8 @@ class ReadThread implements Runnable {
                         Client.outgoingSockets.add(socket);
 
                         //add config change to the log
-                        Client.log.put(packet.getIndex(),"Config Change - ADD "+packet.getPair().get(0)+"-"+packet.getPair().get(1));
-                        Client.firstUnchosenIndex = packet.getIndex() + 1;
+                        Client.log.put(Client.firstUnchosenIndex, "Config Change - ADD "+packet.getPair().get(0)+"-"+packet.getPair().get(1));
+                        Client.firstUnchosenIndex++;
 
                         // start heartbeat
                         try {
@@ -154,7 +155,7 @@ class ReadThread implements Runnable {
                         if(Client.host.equals(Client.leaderPid[0]) &&
                                 Client.pair.get(1).equals(Client.leaderPid[1])) {
                             ObjectOutputStream outStream = new ObjectOutputStream(socket.getOutputStream());
-                            LogRep log = new LogRep(Client.log, Client.leaderPid, "log", Client.resTicket);
+                            LogRep log = new LogRep(Client.log, Client.leaderPid, "log", Client.resTicket, Client.firstUnchosenIndex);
                             outStream.writeObject(log);
                         }
 
@@ -169,6 +170,7 @@ class ReadThread implements Runnable {
                         Client.log = logRep.getLog();
                         Client.leaderPid = logRep.getLeaderPid();
                         Client.resTicket = logRep.getRemainingTickets();
+                        Client.firstUnchosenIndex = logRep.getFirstUnchosenIndex();
 
                     }
                 }

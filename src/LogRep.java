@@ -8,12 +8,14 @@ public class LogRep implements Serializable {
     private String[] leaderPid;
     private String message;
     private int remainingTickets;
+    private int firstUnchosenIndex;
 
-    public LogRep(Map<Integer, String> log, String[] leaderPid, String message, int remainingTickets) {
+    public LogRep(Map<Integer, String> log, String[] leaderPid, String message, int remainingTickets, int firstUnchosenIndex) {
         this.log = log;
         this.leaderPid = leaderPid;
         this.message = message;
         this.remainingTickets = remainingTickets;
+        this.firstUnchosenIndex = firstUnchosenIndex;
     }
 
     public Map<Integer, String> getLog() {
@@ -30,5 +32,9 @@ public class LogRep implements Serializable {
 
     public String getMessage() {
         return message;
+    }
+
+    public int getFirstUnchosenIndex() {
+        return firstUnchosenIndex;
     }
 }
